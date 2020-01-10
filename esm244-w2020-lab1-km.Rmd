@@ -1,0 +1,96 @@
+---
+title: "ESM 244 Lab 1"
+author: "Keene Morrow"
+date: "1/9/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# attach packages
+library(tidyverse)
+library(here)
+library(janitor)
+library(kableExtra)
+```
+
+Read in noaa_fisheries.csv data
+
+```{r}
+us_landings <-  read_csv(here::here("data", "noaa_fisheries.csv"))
+
+```
+
+Now, make a tidy version of the data frame.
+
+Using:
+- `str_to_lower`
+- `parse_number`
+
+```{r}
+landings_tidy <- us_landings %>%
+  janitor::clean_names() %>%
+  mutate(state = stringr::str_to_lower(state),
+         afs_name = stringr::str_to_lower(afs_name)) %>% # intentionally overwriting existing state column
+  mutate(dollars_usd = parse_number(dollars_usd)) # use parse_number to remove $ from dollars_usd
+```
+
+Let's just look at salmon
+
+Using:
+- `str_remove`
+- `str_detect`
+- `tidyr::separate`
+
+```{r}
+salmon_landings <- landings_tidy %>%
+  mutate(afs_clean = str_remove(afs_name, pattern = " aggregate")) %>% # removes string "aggregate" from column
+  filter(str_detect(afs_clean, pattern = "salmon")) %>% # filters by looking for "salmon" in afs_clean
+  separate(afs_clean, into = c("group", "species"), sep = ",") # splits column into two based on commas
+```
+
+Find grouped summary data
+
+
+Find annual total US landings and dollar value (summing across all state) for each type of salmon using `group_by()` and `summarise()`.
+
+```{r}
+salmon_summary <- salmon_landings %>%
+  group_by(year, species) %>%
+  summarize(tot_landings = sum(landings_pounds),
+            tot_value = sum(dollars_usd))
+```
+
+Visualization:
+
+```{r}
+salmon_landings_graph <- ggplot(data = salmon_summary,
+                                aes(x = year, y = tot_landings, group = species)) + # groups species, this can also be done as color = species here or in the geom
+  geom_line() +
+  theme_minimal()
+  
+
+salmon_landings_graph # storing the graph as an object can make ggsave work a little better because you can call the fucntion on a specific graph, not just the last run graph
+```
+
+Exporting graph with ggsave
+```{r}
+ggsave(plot = salmon_landings_graph,
+       here("figures", "us_salmon_km.png"),
+       height = 5, width = 8)
+```
+
+Kable table:
+```{r}
+salmon_first_5 <- salmon_summary %>%
+  head(5)
+```
+
+```{r}
+kable(salmon_first_5) %>%
+  kable_styling(bootstrap_options = "striped",
+                full_width = FALSE)
+
+```
+
